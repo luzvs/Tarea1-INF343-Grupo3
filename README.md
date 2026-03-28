@@ -7,7 +7,9 @@ cd parte1/api
 
 En la terminal:
 go mod init parte1/api
+
 go get github.com/gin-gonic/gin
+
 go mod tidy
 
 Ejecutar:
