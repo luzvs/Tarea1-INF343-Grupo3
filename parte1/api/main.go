@@ -102,5 +102,5 @@ func main() {
 	r.POST("/weapons", AddWeaponh)
 	r.PATCH("/weapons/:weapon_name", DesWeaponh)
 
-	r.Run(":8080")
+	r.Run("0.0.0.0:8080")
 }
