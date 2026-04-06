@@ -11,7 +11,7 @@ import (
 	"strings"
 )
 
-const serverURL = "http://localhost:8080"
+const serverURL = "http://10.10.28.17:8080"
 
 func main() {
 	reader := bufio.NewReader(os.Stdin)
