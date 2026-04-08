@@ -4,135 +4,138 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
 	"time"
 )
 
-const baseURL = "http://10.10.28.17:8080"
-
-const requests = 100
-
-func measureGET() time.Duration {
-
-	start := time.Now()
-
-	resp, err := http.Get(baseURL + "/weapons")
-	if err != nil {
-		return 0
-	}
-
-	resp.Body.Close()
-
-	return time.Since(start)
-}
-
-func measurePOST(name string) time.Duration {
-
-	body := map[string]interface{}{
-		"weapon_name": name,
-		"stock":       100,
-	}
-
-	data, _ := json.Marshal(body)
-
-	start := time.Now()
-
-	resp, err := http.Post(baseURL+"/weapons", "application/json", bytes.NewBuffer(data))
-	if err != nil {
-		return 0
-	}
-
-	resp.Body.Close()
-
-	return time.Since(start)
-}
-
-func measurePATCH(name string) time.Duration {
-
-	body := map[string]int{
-		"stock": 1,
-	}
-
-	data, _ := json.Marshal(body)
-
-	req, _ := http.NewRequest(
-		"PATCH",
-		baseURL+"/weapons/"+name,
-		bytes.NewBuffer(data),
-	)
-
-	req.Header.Set("Content-Type", "application/json")
-
-	client := &http.Client{}
-
-	start := time.Now()
-
-	resp, err := client.Do(req)
-	if err != nil {
-		return 0
-	}
-
-	resp.Body.Close()
-
-	return time.Since(start)
-}
+const serverURL = "http://10.10.28.17:8080"
+const totalTests = 100
 
 func main() {
 
 	file, err := os.Create("testing_results.txt")
 	if err != nil {
-		panic(err)
+		fmt.Println("Error creando archivo:", err)
+		return
 	}
 	defer file.Close()
+
+	fmt.Println("Iniciando pruebas...")
+
+	client := &http.Client{}
 
 	var totalGET time.Duration
 	var totalPOST time.Duration
 	var totalPATCH time.Duration
 
-	fmt.Println("Iniciando pruebas...")
+	//----------------------------------
+	// TEST GET
+	//----------------------------------
 
-	// GET
-	for i := 0; i < requests; i++ {
+	for i := 1; i <= totalTests; i++ {
 
-		t := measureGET()
+		start := time.Now()
 
-		totalGET += t
+		resp, err := client.Get(serverURL + "/weapons")
+		if err != nil {
+			fmt.Println("Error GET:", err)
+			continue
+		}
 
-		file.WriteString(fmt.Sprintf("GET %d: %v\n", i+1, t))
+		io.ReadAll(resp.Body)
+		resp.Body.Close()
 
-		time.Sleep(50 * time.Millisecond)
+		duration := time.Since(start)
+		totalGET += duration
+
+		ms := float64(duration.Microseconds()) / 1000
+		fmt.Fprintf(file, "GET %d: %.3f ms\n", i, ms)
 	}
 
-	// POST + PATCH sobre armas de prueba
-	for i := 0; i < requests; i++ {
+	//----------------------------------
+	// TEST POST + PATCH
+	//----------------------------------
 
-		name := fmt.Sprintf("test_weapon_%d", i)
+	for i := 1; i <= totalTests; i++ {
 
-		postTime := measurePOST(name)
-		totalPOST += postTime
+		weaponName := fmt.Sprintf("test_weapon_%d", i)
 
-		file.WriteString(fmt.Sprintf("POST %d: %v\n", i+1, postTime))
+		postBody := map[string]interface{}{
+			"weapon_name": weaponName,
+			"stock":       10,
+		}
 
-		time.Sleep(50 * time.Millisecond)
+		jsonData, _ := json.Marshal(postBody)
 
-		patchTime := measurePATCH(name)
-		totalPATCH += patchTime
+		//----------------------------------
+		// POST
+		//----------------------------------
 
-		file.WriteString(fmt.Sprintf("PATCH %d: %v\n", i+1, patchTime))
+		startPost := time.Now()
 
-		time.Sleep(50 * time.Millisecond)
+		reqPost, _ := http.NewRequest("POST", serverURL+"/weapons", bytes.NewBuffer(jsonData))
+		reqPost.Header.Set("Content-Type", "application/json")
+
+		respPost, err := client.Do(reqPost)
+		if err != nil {
+			fmt.Println("Error POST:", err)
+			continue
+		}
+
+		io.ReadAll(respPost.Body)
+		respPost.Body.Close()
+
+		durationPost := time.Since(startPost)
+		totalPOST += durationPost
+
+		msPost := float64(durationPost.Microseconds()) / 1000
+		fmt.Fprintf(file, "POST %d: %.3f ms\n", i, msPost)
+
+		//----------------------------------
+		// PATCH
+		//----------------------------------
+
+		patchBody := map[string]interface{}{
+			"stock": 1,
+		}
+
+		jsonPatch, _ := json.Marshal(patchBody)
+
+		startPatch := time.Now()
+
+		reqPatch, _ := http.NewRequest("PATCH", serverURL+"/weapons/"+weaponName, bytes.NewBuffer(jsonPatch))
+		reqPatch.Header.Set("Content-Type", "application/json")
+
+		respPatch, err := client.Do(reqPatch)
+		if err != nil {
+			fmt.Println("Error PATCH:", err)
+			continue
+		}
+
+		io.ReadAll(respPatch.Body)
+		respPatch.Body.Close()
+
+		durationPatch := time.Since(startPatch)
+		totalPATCH += durationPatch
+
+		msPatch := float64(durationPatch.Microseconds()) / 1000
+		fmt.Fprintf(file, "PATCH %d: %.3f ms\n", i, msPatch)
 	}
 
-	avgGET := totalGET / requests
-	avgPOST := totalPOST / requests
-	avgPATCH := totalPATCH / requests
+	//----------------------------------
+	// PROMEDIOS
+	//----------------------------------
 
-	file.WriteString("\n=== PROMEDIOS ===\n")
+	avgGET := float64(totalGET.Microseconds()) / float64(totalTests) / 1000
+	avgPOST := float64(totalPOST.Microseconds()) / float64(totalTests) / 1000
+	avgPATCH := float64(totalPATCH.Microseconds()) / float64(totalTests) / 1000
 
-	file.WriteString(fmt.Sprintf("GET promedio: %v\n", avgGET))
-	file.WriteString(fmt.Sprintf("POST promedio: %v\n", avgPOST))
-	file.WriteString(fmt.Sprintf("PATCH promedio: %v\n", avgPATCH))
+	fmt.Fprintf(file, "\n=== PROMEDIOS ===\n")
+	fmt.Fprintf(file, "GET promedio: %.3f ms\n", avgGET)
+	fmt.Fprintf(file, "POST promedio: %.3f ms\n", avgPOST)
+	fmt.Fprintf(file, "PATCH promedio: %.3f ms\n", avgPATCH)
 
 	fmt.Println("Testing finalizado. Resultados guardados en testing_results.txt")
 }
