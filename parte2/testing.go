@@ -24,15 +24,11 @@ func main() {
 
 	fmt.Println("Iniciando pruebas...")
 
-	client := &http.Client{}
-
 	var totalGET time.Duration
 	var totalPOST time.Duration
 	var totalPATCH time.Duration
 
-	//----------------------------------
-	// TEST GET
-	//----------------------------------
+	client := &http.Client{}
 
 	for i := 1; i <= totalTests; i++ {
 
@@ -50,28 +46,22 @@ func main() {
 		duration := time.Since(start)
 		totalGET += duration
 
-		ms := float64(duration.Microseconds()) / 1000
+		ms := duration.Seconds() * 1000
+
 		fmt.Fprintf(file, "GET %d: %.3f ms\n", i, ms)
 	}
-
-	//----------------------------------
-	// TEST POST + PATCH
-	//----------------------------------
 
 	for i := 1; i <= totalTests; i++ {
 
 		weaponName := fmt.Sprintf("test_weapon_%d", i)
 
+		// POST
 		postBody := map[string]interface{}{
 			"weapon_name": weaponName,
 			"stock":       10,
 		}
 
 		jsonData, _ := json.Marshal(postBody)
-
-		//----------------------------------
-		// POST
-		//----------------------------------
 
 		startPost := time.Now()
 
@@ -90,13 +80,11 @@ func main() {
 		durationPost := time.Since(startPost)
 		totalPOST += durationPost
 
-		msPost := float64(durationPost.Microseconds()) / 1000
+		msPost := durationPost.Seconds() * 1000
+
 		fmt.Fprintf(file, "POST %d: %.3f ms\n", i, msPost)
 
-		//----------------------------------
 		// PATCH
-		//----------------------------------
-
 		patchBody := map[string]interface{}{
 			"stock": 1,
 		}
@@ -120,17 +108,14 @@ func main() {
 		durationPatch := time.Since(startPatch)
 		totalPATCH += durationPatch
 
-		msPatch := float64(durationPatch.Microseconds()) / 1000
+		msPatch := durationPatch.Seconds() * 1000
+
 		fmt.Fprintf(file, "PATCH %d: %.3f ms\n", i, msPatch)
 	}
 
-	//----------------------------------
-	// PROMEDIOS
-	//----------------------------------
-
-	avgGET := float64(totalGET.Microseconds()) / float64(totalTests) / 1000
-	avgPOST := float64(totalPOST.Microseconds()) / float64(totalTests) / 1000
-	avgPATCH := float64(totalPATCH.Microseconds()) / float64(totalTests) / 1000
+	avgGET := (totalGET.Seconds() * 1000) / totalTests
+	avgPOST := (totalPOST.Seconds() * 1000) / totalTests
+	avgPATCH := (totalPATCH.Seconds() * 1000) / totalTests
 
 	fmt.Fprintf(file, "\n=== PROMEDIOS ===\n")
 	fmt.Fprintf(file, "GET promedio: %.3f ms\n", avgGET)
