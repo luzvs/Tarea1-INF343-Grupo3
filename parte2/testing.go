@@ -10,24 +10,27 @@ import (
 )
 
 const baseURL = "http://10.10.28.17:8080"
-
 const requests = 100
 
-func measureGET() time.Duration {
+var client = &http.Client{
+	Timeout: 5 * time.Second,
+}
+
+func measureGET() int64 {
 
 	start := time.Now()
 
-	resp, err := http.Get(baseURL + "/weapons")
+	resp, err := client.Get(baseURL + "/weapons")
 	if err != nil {
 		return 0
 	}
 
 	resp.Body.Close()
 
-	return time.Since(start)
+	return time.Since(start).Microseconds()
 }
 
-func measurePOST(name string) time.Duration {
+func measurePOST(name string) int64 {
 
 	body := map[string]interface{}{
 		"weapon_name": name,
@@ -38,17 +41,17 @@ func measurePOST(name string) time.Duration {
 
 	start := time.Now()
 
-	resp, err := http.Post(baseURL+"/weapons", "application/json", bytes.NewBuffer(data))
+	resp, err := client.Post(baseURL+"/weapons", "application/json", bytes.NewBuffer(data))
 	if err != nil {
 		return 0
 	}
 
 	resp.Body.Close()
 
-	return time.Since(start)
+	return time.Since(start).Microseconds()
 }
 
-func measurePATCH(name string) time.Duration {
+func measurePATCH(name string) int64 {
 
 	body := map[string]int{
 		"stock": 1,
@@ -64,8 +67,6 @@ func measurePATCH(name string) time.Duration {
 
 	req.Header.Set("Content-Type", "application/json")
 
-	client := &http.Client{}
-
 	start := time.Now()
 
 	resp, err := client.Do(req)
@@ -75,7 +76,7 @@ func measurePATCH(name string) time.Duration {
 
 	resp.Body.Close()
 
-	return time.Since(start)
+	return time.Since(start).Microseconds()
 }
 
 func main() {
@@ -86,9 +87,9 @@ func main() {
 	}
 	defer file.Close()
 
-	var totalGET time.Duration
-	var totalPOST time.Duration
-	var totalPATCH time.Duration
+	var totalGET int64
+	var totalPOST int64
+	var totalPATCH int64
 
 	fmt.Println("Iniciando pruebas...")
 
@@ -99,12 +100,12 @@ func main() {
 
 		totalGET += t
 
-		file.WriteString(fmt.Sprintf("GET %d: %v\n", i+1, t))
+		file.WriteString(fmt.Sprintf("GET %d: %d us\n", i+1, t))
 
 		time.Sleep(50 * time.Millisecond)
 	}
 
-	// POST + PATCH sobre armas de prueba
+	// POST + PATCH
 	for i := 0; i < requests; i++ {
 
 		name := fmt.Sprintf("test_weapon_%d", i)
@@ -112,14 +113,14 @@ func main() {
 		postTime := measurePOST(name)
 		totalPOST += postTime
 
-		file.WriteString(fmt.Sprintf("POST %d: %v\n", i+1, postTime))
+		file.WriteString(fmt.Sprintf("POST %d: %d us\n", i+1, postTime))
 
 		time.Sleep(50 * time.Millisecond)
 
 		patchTime := measurePATCH(name)
 		totalPATCH += patchTime
 
-		file.WriteString(fmt.Sprintf("PATCH %d: %v\n", i+1, patchTime))
+		file.WriteString(fmt.Sprintf("PATCH %d: %d us\n", i+1, patchTime))
 
 		time.Sleep(50 * time.Millisecond)
 	}
@@ -130,9 +131,9 @@ func main() {
 
 	file.WriteString("\n=== PROMEDIOS ===\n")
 
-	file.WriteString(fmt.Sprintf("GET promedio: %v\n", avgGET))
-	file.WriteString(fmt.Sprintf("POST promedio: %v\n", avgPOST))
-	file.WriteString(fmt.Sprintf("PATCH promedio: %v\n", avgPATCH))
+	file.WriteString(fmt.Sprintf("GET promedio: %d us\n", avgGET))
+	file.WriteString(fmt.Sprintf("POST promedio: %d us\n", avgPOST))
+	file.WriteString(fmt.Sprintf("PATCH promedio: %d us\n", avgPATCH))
 
 	fmt.Println("Testing finalizado. Resultados guardados en testing_results.txt")
 }
